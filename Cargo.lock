@@ -212,6 +212,7 @@ dependencies = [
  "rand",
  "regex",
  "sysinfo",
+ "winapi",
 ]
 
 [[package]]

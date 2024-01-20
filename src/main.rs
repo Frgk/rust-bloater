@@ -1,6 +1,9 @@
+extern crate winapi;
+
 use core::slice;
-use std::fs::{File, self};
-use std::io::prelude::*;
+use std::fs::*;
+use std::io::*;
+use std::os::windows::prelude::*;
 use std::path::Path;
 use rand::Rng;
 use regex::Regex;
@@ -10,15 +13,13 @@ use filetime::{set_file_times,FileTime};
 
 // Slice the string to get the root disk letter if it's Windows
 fn slice_string(input: &str) -> &str {
-
+	// Define the pattern to detect the filesystem : Windows or Unix
 	let pattern = Regex::new(r"(\\)|(/)").unwrap();
 	let parts: Vec<&str> = pattern.split(input).collect();
 
+	// Return the root folder
 	return parts[0];
 }
-
-
-
 
 fn main() -> std::io::Result<()> {
 
@@ -43,11 +44,11 @@ fn main() -> std::io::Result<()> {
 
 		// Search for a valid path to write to
 		let mut valid_path = String::new();
-		// tmp folder don't need admin access to write to
+		// tmp or temp folder don't need admin access to write to
 		let path_array = [r"/temp/", r"/tmp/"];
-
 		for path in path_array {
 		let temp_path:String = format!("{}{}",disk_root, path).as_str().to_string();
+		// If a valid path is found
 		if Path::new(&temp_path).is_dir() {
 			valid_path = temp_path; 
 			println!("Valid path : {}", valid_path);
@@ -56,9 +57,11 @@ fn main() -> std::io::Result<()> {
 		}
 		// At this point, we found a valid folder for the disk
 
-
+		// Create a random number
 		let mut rng = rand::thread_rng();
 				
+		
+		/*
 		// Create the files
 		for _ in 1..2{
 
@@ -79,10 +82,20 @@ fn main() -> std::io::Result<()> {
 			let mut file = File::create(format!("{}{}.bh",valid_path,n2))?;
 			let _ = file.write_all(&encoded);
 
+			// Cange the access and modified date
 			set_file_times(format!("{}{}.bh",valid_path,n2), FileTime::from_unix_time(1611048846,0),FileTime::from_unix_time(1611048846,0));
-		}
 
-	}
+			// Put the hidden flag to the file (Windows only)
+			let file = OpenOptions::new()
+    		.write(true)
+    		.create(true).truncate(true)
+    		.attributes(winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN)
+    		.open(format!("{}{}.bh",valid_path,n2));
+
+			}
+			*/
+
+	}	
 
 	Ok(())
 
