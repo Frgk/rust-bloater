@@ -9,10 +9,10 @@ Depending on the features enabled when compiling the code, the malware can renam
 
 
 ## Features ##
+| Features | Description | 
+| :---: | :---: |
 | persistent | Add persistence to the bloatware, only working on Windows for now. It manipulates the registry to add a key inside HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run | 
-| :---: | :---: |
-| randomized | The bloat file has a random name.| 
-| :---: | :---: |
+| randomized | The bloat file has a random name.|
 
 ## Examples ##
 You can compile the rust project to have the bloatware with the features you want
