@@ -1,16 +1,17 @@
 # rust-bloater #
-This project is a bloatware programmed in Rust. 
+This project is a bloatware programmed in Rust. It can be compiled to work either on Windows or Linux.
 
 ## Description ##
-Its aim is to fill the principal disk of a computer by creating a file in the temp folder.
-This file has the size of the remaining available space.
+The malware check for specific folders to write to : /temp, /tmp or /tmp
+Once a folder is found, it creates one file inside, either with a constant size, or a size proportional to the remaining capacity of the disk.
+The file created is considered as hidden (hidden attribute in Windows, '.' before the name of the bloat file in Linux).
+Depending on the features enabled when compiling the code, the malware can rename the created file by a random string, or add persistence to execute itself at startup.
 
-I added options to the compilation of the executable to make the bloatware more or less personnalizable (by adding features). However, an executable should be available in the releases.
 
 ## Features ##
-| persistent | Add persistence to the bloatware, only working on Windows for now. | 
+| persistent | Add persistence to the bloatware, only working on Windows for now. It manipulates the registry to add a key inside HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run | 
 | :---: | :---: |
-| randomized | The bloat file has random name. If the feature 'persistent' is enabled, also generate a random name for the new executable. | 
+| randomized | The bloat file has a random name.| 
 | :---: | :---: |
 
 ## Examples ##

