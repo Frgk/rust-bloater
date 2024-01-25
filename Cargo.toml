@@ -15,5 +15,4 @@ winreg = "0.52.0"
 
 [features]
 persistent = []
-hidden = []
 randomized = []

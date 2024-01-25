@@ -10,6 +10,8 @@ I added options to the compilation of the executable to make the bloatware more 
 ## Features ##
 | persistent | Add persistence to the bloatware, only working on Windows for now. | 
 | :---: | :---: |
+| randomized | The bloat file has random name. If the feature 'persistent' is enabled, also generate a random name for the new executable. | 
+| :---: | :---: |
 
 ## Examples ##
 You can compile the rust project to have the bloatware with the features you want
