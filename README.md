@@ -1,11 +1,16 @@
 # rust-bloater #
-This project is a bloatware programmed in Rust. It can be compiled to work either on Windows or Linux.
+This project is a bloatware programmed in Rust. It can be compiled to work on Windows.
+
+## Disclaimer ##
+I aimed to create this malware to improve my skills in Rust and learn about malawares behaviour. 
+It's not designed to be harmful, but just a POC project to how it does work.
 
 ## Description ##
-The malware check for specific folders to write to : /temp, /tmp or /tmp
+The malware check for specific folders to write to : /temp, /tmp or /tmp.
 Once a folder is found, it creates one file inside, either with a constant size, or a size proportional to the remaining capacity of the disk.
 The file created is considered as hidden (hidden attribute in Windows, '.' before the name of the bloat file in Linux).
-Depending on the features enabled when compiling the code, the malware can rename the created file by a random string, or add persistence to execute itself at startup.
+
+By default, the malware is just an executable that create a file, that's all ! Depending on the features enabled when compiling the code, the malware can rename the created file by a random string, or add persistence to execute itself at startup.
 
 
 ## Features ##

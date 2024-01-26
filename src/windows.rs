@@ -1,6 +1,6 @@
 extern crate winapi;
 
-use winreg::enums::RegType::REG_BINARY;
+// use winreg::enums::RegType::REG_BINARY;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
 use winreg::{RegKey, RegValue};
 use std::os::windows::prelude::*;
