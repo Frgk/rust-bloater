@@ -6,9 +6,9 @@ I aimed to create this malware to improve my skills in Rust and learn about mala
 It's not designed to be harmful, but just a POC project to how it does work.
 
 ## Description ##
-The malware check for specific folders to write to : /temp, /tmp or /tmp.
-Once a folder is found, it creates one file inside, either with a constant size, or a size proportional to the remaining capacity of the disk.
-The file created is considered as hidden (hidden attribute in Windows, '.' before the name of the bloat file in Linux).
+The malware check for specific folders to write to : **/temp**, **/tmp** or **/**.
+Once a folder is found, it creates one bloat file inside (extension in **.bh**), either with a constant size, or a size proportional to the remaining capacity of the disk.
+The file created is considered as hidden (hidden attribute in Windows).
 
 By default, the malware is just an executable that create a file, that's all ! Depending on the features enabled when compiling the code, the malware can rename the created file by a random string, or add persistence to execute itself at startup.
 

